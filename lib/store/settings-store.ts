@@ -44,17 +44,14 @@ export const getDefaultAdultSources = (): VideoSource[] => ADULT_SOURCES;
 
 
 
-function getEnvSubscriptions(): SourceSubscription[] {
-  if (typeof process === 'undefined' || !process.env.NEXT_PUBLIC_SUBSCRIPTION_SOURCES) {
-    return [];
-  }
-
-  const envValue = process.env.NEXT_PUBLIC_SUBSCRIPTION_SOURCES.trim();
+export function parseEnvSubscriptions(envValue: string | undefined): SourceSubscription[] {
   if (!envValue) return [];
+  const trimmed = envValue.trim();
+  if (!trimmed) return [];
 
   // 1. Try JSON
   try {
-    const raw = JSON.parse(envValue);
+    const raw = JSON.parse(trimmed);
     if (Array.isArray(raw)) {
       return raw
         .filter((item: any) => item && typeof item.name === 'string' && typeof item.url === 'string')
@@ -65,11 +62,9 @@ function getEnvSubscriptions(): SourceSubscription[] {
   }
 
   // 2. Try Simple URL (or comma separated)
-  // Check if it looks like a URL (basic check)
-  if (envValue.includes('http')) {
-    const urls = envValue.split(',').map(u => u.trim()).filter(u => u.length > 0);
+  if (trimmed.includes('http')) {
+    const urls = trimmed.split(',').map(u => u.trim()).filter(u => u.length > 0);
     return urls.map((url, index) => {
-      // Basic URL validation
       if (!url.startsWith('http')) return null;
 
       const name = urls.length > 1
@@ -81,6 +76,14 @@ function getEnvSubscriptions(): SourceSubscription[] {
   }
 
   return [];
+}
+
+function getEnvSubscriptions(): SourceSubscription[] {
+  if (typeof process === 'undefined' || !process.env.NEXT_PUBLIC_SUBSCRIPTION_SOURCES) {
+    return [];
+  }
+
+  return parseEnvSubscriptions(process.env.NEXT_PUBLIC_SUBSCRIPTION_SOURCES);
 }
 // Debugging helper
 // console.log("Environment Subscriptions:", getEnvSubscriptions());
@@ -157,11 +160,17 @@ export const settingsStore = {
       });
 
       // Filter out invalid sources (missing baseUrl etc)
-      const validSources = (Array.isArray(parsed.sources) ? parsed.sources : getDefaultSources())
-        .filter((s: any) => s && s.id && s.name && s.baseUrl);
+      const parsedSources = Array.isArray(parsed.sources) && parsed.sources.length > 0
+        ? parsed.sources
+        : getDefaultSources();
 
-      const validAdultSources = (Array.isArray(parsed.adultSources) ? parsed.adultSources : getDefaultAdultSources())
-        .filter((s: any) => s && s.id && s.name && s.baseUrl);
+      const validSources = parsedSources.filter((s: any) => s && s.id && s.name && s.baseUrl);
+
+      const parsedAdultSources = Array.isArray(parsed.adultSources) && parsed.adultSources.length > 0
+        ? parsed.adultSources
+        : getDefaultAdultSources();
+
+      const validAdultSources = parsedAdultSources.filter((s: any) => s && s.id && s.name && s.baseUrl);
 
       // Validate that parsed data has all required properties
       return {
